@@ -64,7 +64,7 @@ public class CompletableFutureBasics {
         assertEquals(person, optPerson.get());
 
         // TODO Create stream with a single element
-        final Stream<Person> streamPerson = Arrays.stream(new Person[]{person});
+        final Stream<Person> streamPerson = Stream.of(person);
 
         final List<Person> persons = streamPerson.collect(toList());
         assertThat(persons.size(), is(1));
@@ -92,7 +92,8 @@ public class CompletableFutureBasics {
 
         // TODO Complete CompletableFuture with NoSuchElementException
         final CompletableFuture<Person> futurePerson =
-                CompletableFuture.completedFuture(optPerson).thenApply(x->x.get());
+                new CompletableFuture<>();
+        futurePerson.completeExceptionally(new NoSuchElementException());
 
         assertTrue(futurePerson.isCompletedExceptionally());
         assertTrue(futurePerson
