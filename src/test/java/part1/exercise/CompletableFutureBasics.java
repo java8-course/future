@@ -178,7 +178,7 @@ public class CompletableFutureBasics {
         assertEquals(Integer.valueOf(65), optFirstCodePointOfFirstName.get());
 
         // TODO Create stream with a single element
-        final Stream<Person> streamPerson = Stream.empty();
+        final Stream<Person> streamPerson = Stream.of(person);
 
         // TODO Using flatMapToInt and .getFirstName().codePoints() get codepoints stream from streamPerson
         final IntStream codePoints =
