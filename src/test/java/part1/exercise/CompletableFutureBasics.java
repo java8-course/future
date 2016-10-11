@@ -94,7 +94,8 @@ public class CompletableFutureBasics {
         assertThat(persons.size(), is(0));
 
         // Complete CompletableFuture with NoSuchElementException
-        final CompletableFuture<Person> futurePerson = CompletableFuture.completedFuture(optPerson).thenApply(Optional::get);
+        final CompletableFuture<Person> futurePerson = new CompletableFuture<>();
+        futurePerson.completeExceptionally(new NoSuchElementException());
 
         assertTrue(futurePerson.isCompletedExceptionally());
         assertTrue(futurePerson
