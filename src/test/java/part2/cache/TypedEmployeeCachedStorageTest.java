@@ -85,12 +85,6 @@ public class TypedEmployeeCachedStorageTest {
     }
 
     @Test
-    public void expiration() {
-
-
-    }
-
-    @Test
     public void testGetTypedEmployee() throws InterruptedException, ExecutionException {
         final CachingDataStorage.OutdatableResult<data.typed.Employee> empA = typedCache.getOutdatable("a");
         assertThat(empA.getOutdated().isDone(), is(false));
