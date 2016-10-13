@@ -32,17 +32,19 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
         final Employer[] employers;
         final int[] durations;
         final AtomicInteger entriesRequired;
-        private final CompletableFuture<Employee> future;
         private final Person person;
 
-        private TypedEmployeeBuilder(data.Employee employee, CompletableFuture<Employee> future) {
+        // Gets completed when all positions and employers are filled
+        private final CompletableFuture<Employee> futureEmployee;
+
+        private TypedEmployeeBuilder(data.Employee employee) {
             historySize = employee.getJobHistory().size();
             positions = new Position[historySize];
             employers = new Employer[historySize];
             durations = new int[historySize];
             entriesRequired = new AtomicInteger(historySize * 2);
-            this.future = future;
             person = employee.getPerson();
+            futureEmployee = new CompletableFuture<>();
         }
 
         void setDuration(int i, int duration) {
@@ -63,16 +65,19 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
             List<JobHistoryEntry> jobs = new ArrayList<>(historySize);
             for (int i = 0; i < historySize; i++)
                 jobs.add(new JobHistoryEntry(positions[i], employers[i], durations[i]));
-            future.complete(new Employee(person, jobs));
+            futureEmployee.complete(new Employee(person, jobs));
         }
 
+        CompletableFuture<Employee> getFutureEmployee() {
+            return futureEmployee;
+        }
     }
 
     private CompletableFuture<Employee> constructTypedEmployee(data.Employee employee, Runnable whenOutdated) {
         final List<data.JobHistoryEntry> jobHistory = employee.getJobHistory();
 
-        CompletableFuture<Employee> typedEmployee = new CompletableFuture<>();
-        final TypedEmployeeBuilder builder = new TypedEmployeeBuilder(employee, typedEmployee);
+        final TypedEmployeeBuilder builder = new TypedEmployeeBuilder(employee);
+        final CompletableFuture<Employee> typedEmployee = builder.getFutureEmployee();
 
         // Getting list elements by index may be slow,
         // forEach cannot guarantee proper order of the elements,
