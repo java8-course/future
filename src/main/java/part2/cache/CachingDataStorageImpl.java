@@ -1,7 +1,6 @@
 package part2.cache;
 
 import db.DataStorage;
-import db.SlowCompletableFutureDb;
 
 import java.util.concurrent.*;
 
@@ -32,15 +31,14 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
 
     @Override
     public OutdatableResult<T> getOutdatable(String key) {
-        final OutdatableResult<T> cachedResult = cache.get(key);
+        final CompletableFuture<Void> outdated = new CompletableFuture<>();
+        final CompletableFuture<T> dbResponse = new CompletableFuture<>();
+        final OutdatableResult<T> result = new OutdatableResult<>(dbResponse, outdated);
+        final OutdatableResult<T> cachedResult = cache.putIfAbsent(key, result);
         if (cachedResult != null) return cachedResult;
 
-        final CompletableFuture<Void> outdated = new CompletableFuture<>();
-        final CompletableFuture<T> dbResponse = db.get(key);
-        final OutdatableResult<T> result = new OutdatableResult<>(dbResponse, outdated);
-        cache.put(key, result); // TODO: use putifabsent
-
-        dbResponse.thenAccept(value -> scheduledExecutorService.schedule(
+        db.get(key).thenAccept(dbResponse::complete);
+        dbResponse.thenRun(() -> scheduledExecutorService.schedule(
                 () -> {
                     cache.remove(key, result);
                     outdated.complete(null);
@@ -49,12 +47,5 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
                 timeoutUnits));
 
         return result;
-        // TODO implement
-        // TODO use ScheduledExecutorService to remove outdated result from cache - see SlowCompletableFutureDb implementation
-        // TODO complete OutdatableResult::outdated after removing outdated result from cache
-        // TODO don't use obtrudeException on result - just don't
-        // TODO use remove(Object key, Object value) to remove target value
-        // TODO Start timeout after receiving result in CompletableFuture, not after receiving CompletableFuture itself
-
     }
 }
