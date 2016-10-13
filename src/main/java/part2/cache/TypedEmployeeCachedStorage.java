@@ -77,7 +77,6 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
         final List<data.JobHistoryEntry> jobHistory = employee.getJobHistory();
 
         final TypedEmployeeBuilder builder = new TypedEmployeeBuilder(employee);
-        final CompletableFuture<Employee> typedEmployee = builder.getFutureEmployee();
 
         // Getting list elements by index may be slow,
         // forEach cannot guarantee proper order of the elements,
@@ -95,7 +94,7 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
             position.getOutdated().thenRun(whenOutdated);
         }
 
-        return typedEmployee;
+        return builder.getFutureEmployee();
     }
 
     @Override
