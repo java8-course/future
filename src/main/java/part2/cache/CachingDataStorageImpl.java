@@ -39,22 +39,33 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
         // TODO use remove(Object key, Object value) to remove target value
         // TODO Start timeout after receiving result in CompletableFuture, not after receiving CompletableFuture itself
 
-        if (cache.get(key)!=null) return cache.get(key);
-
         CompletableFuture<Void> outdated = new CompletableFuture<>();
+
+        CompletableFuture<T> dbAnswer = new CompletableFuture<>();
+
+        OutdatableResult<T> result =
+                new OutdatableResult<>(
+                        dbAnswer,                   //DB answer
+                        outdated);                  //OutDated
+
+        OutdatableResult<T> previous = cache.putIfAbsent(key, result);
+        if (previous!=null) {
+            return previous;
+        }
+
+
         CompletableFuture<T> actual = db.get(key);
-        OutdatableResult<T> result = new OutdatableResult<>(actual, outdated);
-        cache.putIfAbsent(key, result);
-        actual.thenRun(() ->
-                scheduledExecutorService.schedule(
-                        () -> {
-                            cache.remove(key);
-                            outdated.complete(null);
-                        },
-                        timeout,
-                        timeoutUnits
-                )
-        );
+        actual.thenAccept((t) -> {
+            scheduledExecutorService.schedule(
+                    () -> {
+                        cache.remove(key);
+                        outdated.complete(null);
+                    },
+                    timeout,
+                    timeoutUnits
+                );
+            dbAnswer.complete(t);
+        });
 
         return result;
     }
