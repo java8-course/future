@@ -9,10 +9,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.function.Function;
@@ -89,8 +86,8 @@ public class CompletableFutureBasics {
         assertThat(persons.size(), is(0));
 
         // Complete CompletableFuture with NoSuchElementException
-        final CompletableFuture<Person> futurePerson = CompletableFuture.completedFuture(optPerson)
-                .thenApply(Optional::get);
+        final CompletableFuture<Person> futurePerson = new CompletableFuture<>();
+        futurePerson.completeExceptionally(new NoSuchElementException());
         assertTrue(futurePerson.isCompletedExceptionally());
         assertTrue(futurePerson
                 .thenApply(x -> false)
