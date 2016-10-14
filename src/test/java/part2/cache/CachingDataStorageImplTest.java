@@ -29,7 +29,7 @@ public class CachingDataStorageImplTest {
     private static SlowCompletableFutureDb<Position> positionDb;
 
     @BeforeClass
-    public static void defore() {
+    public static void before() {
         final Map<String, Employer> employerMap =
                 Arrays.stream(Employer.values())
                         .collect(toMap(Employer::name, Function.identity()));
