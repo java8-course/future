@@ -5,12 +5,17 @@ import data.typed.Employee;
 import data.typed.Employer;
 import data.typed.JobHistoryEntry;
 import data.typed.Position;
+import jdk.nashorn.internal.scripts.JO;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntFunction;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class TypedEmployeeCachedStorage implements CachingDataStorage<String, data.typed.Employee> {
 
@@ -26,93 +31,36 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
         this.employerStorage = employerStorage;
     }
 
-    private static class TypedEmployeeBuilder {
-        final int historySize;
-        final Position[] positions;
-        final Employer[] employers;
-        final int[] durations;
-        final AtomicInteger entriesRequired;
-        private final Person person;
+    private CompletableFuture<Employee> typedEmployee(data.Employee empl, ConcurrentLinkedQueue<CompletableFuture<Void>> outdated) {
+        final CompletableFuture<JobHistoryEntry>[] jobHistoryArray = empl.getJobHistory().stream()
+                .map(jhe -> {
+                    final OutdatableResult<Employer> employer = employerStorage.getOutdatable(jhe.getEmployer());
+                    final OutdatableResult<Position> position = positionStorage.getOutdatable(jhe.getPosition());
+                    outdated.add(employer.getOutdated());
+                    outdated.add(position.getOutdated());
 
-        // Gets completed when all positions and employers are filled
-        private final CompletableFuture<Employee> futureEmployee;
+                    return CompletableFuture.allOf(employer.getResult(), position.getResult())
+                            .thenApply(v -> new JobHistoryEntry(position.getResult().join(), employer.getResult().join(), jhe.getDuration()));
+                }).toArray((IntFunction<CompletableFuture<JobHistoryEntry>[]>) CompletableFuture[]::new);
 
-        private TypedEmployeeBuilder(data.Employee employee) {
-            historySize = employee.getJobHistory().size();
-            positions = new Position[historySize];
-            employers = new Employer[historySize];
-            durations = new int[historySize];
-            entriesRequired = new AtomicInteger(historySize * 2);
-            person = employee.getPerson();
-            futureEmployee = new CompletableFuture<>();
-        }
 
-        void setDuration(int i, int duration) {
-            durations[i] = duration;
-        }
-
-        void setPosition(int i, Position pos) {
-            positions[i] = pos;
-            if (entriesRequired.decrementAndGet() == 0) completeFuture();
-        }
-
-        void setEmployer(int i, Employer emplr) {
-            employers[i] = emplr;
-            if (entriesRequired.decrementAndGet() == 0) completeFuture();
-        }
-
-        private void completeFuture() {
-            List<JobHistoryEntry> jobs = new ArrayList<>(historySize);
-            for (int i = 0; i < historySize; i++)
-                jobs.add(new JobHistoryEntry(positions[i], employers[i], durations[i]));
-            futureEmployee.complete(new Employee(person, jobs));
-        }
-
-        CompletableFuture<Employee> getFutureEmployee() {
-            return futureEmployee;
-        }
-    }
-
-    private CompletableFuture<Employee> constructTypedEmployee(data.Employee employee, Runnable whenOutdated) {
-        final List<data.JobHistoryEntry> jobHistory = employee.getJobHistory();
-
-        final TypedEmployeeBuilder builder = new TypedEmployeeBuilder(employee);
-
-        // Getting list elements by index may be slow,
-        // forEach cannot guarantee proper order of the elements,
-        // have to use "for" loop with iterator
-        final ListIterator<data.JobHistoryEntry> jobIterator = jobHistory.listIterator();
-        for (int i = 0; i < jobHistory.size(); i++) {
-            final int index = i;
-            final data.JobHistoryEntry jobHistoryEntry = jobIterator.next();
-            builder.setDuration(index, jobHistoryEntry.getDuration());
-            final OutdatableResult<Employer> employer = employerStorage.getOutdatable(jobHistoryEntry.getEmployer());
-            employer.getResult().thenAccept(emplr -> builder.setEmployer(index, emplr));
-            employer.getOutdated().thenRun(whenOutdated);
-            final OutdatableResult<Position> position = positionStorage.getOutdatable(jobHistoryEntry.getPosition());
-            position.getResult().thenAccept(pos -> builder.setPosition(index, pos));
-            position.getOutdated().thenRun(whenOutdated);
-        }
-
-        return builder.getFutureEmployee();
+        return null;
     }
 
     @Override
     public OutdatableResult<Employee> getOutdatable(String key) {
-        CompletableFuture<Employee> typedEmployee = new CompletableFuture<>();
-        CompletableFuture<Void> typedOutdated = new CompletableFuture<>();
+        final ConcurrentLinkedQueue<CompletableFuture<Void>> outdated = new ConcurrentLinkedQueue<>();
 
         final OutdatableResult<data.Employee> untypedEmployee = employeeStorage.getOutdatable(key);
 
-        final Runnable outdatedAction = () -> typedOutdated.complete(null);
+        final CompletableFuture<Employee> futureEmployee = untypedEmployee.getResult()
+                .thenCompose(empl -> typedEmployee(empl, outdated));
 
-        untypedEmployee.getOutdated().thenRun(outdatedAction);
+        outdated.add(untypedEmployee.getOutdated());
 
-        untypedEmployee.getResult().thenAccept(empl -> {
-            final CompletableFuture<Employee> futureEmployee = constructTypedEmployee(empl, outdatedAction);
-            futureEmployee.thenAccept(typedEmployee::complete);
-        });
+        final CompletableFuture<Object> anyOutdated = CompletableFuture.anyOf(outdated.toArray(new CompletableFuture[0]));
 
-        return new OutdatableResult<>(typedEmployee, typedOutdated);
+        return new OutdatableResult<>(futureEmployee, anyOutdated.thenRun(() -> {
+        }));
     }
 }
