@@ -12,6 +12,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import part2.cache.CachingDataStorage.OutdatableResult;
 import part3.exercise.ComposeCachingDataStorage;
 import part3.exercise.ListCachingDataStorage;
 import part3.exercise.MappingCachingDataStorage;
@@ -104,6 +105,7 @@ public class TypedEmployeeCachedStorageTest {
     }
 
     private final Person johnGalt37 = new Person("John", "Galt", 37);
+    private final Person johnDoe18 = new Person("John", "Doe", 18);                 // No jobs
     private final JobHistoryEntry jobDevEpam = new JobHistoryEntry(3, "DEV", "EPAM");
     private final JobHistoryEntry jobQAGoogle = new JobHistoryEntry(2, "QA", "Google");
     private final List<JobHistoryEntry> twoJobs = new ArrayList<>(Arrays.asList(jobDevEpam, jobQAGoogle));
@@ -117,6 +119,7 @@ public class TypedEmployeeCachedStorageTest {
         final HashMap<String, Employee> untypedEmployees = new HashMap<>();
 
         untypedEmployees.put("a", new Employee(johnGalt37, twoJobs));
+        untypedEmployees.put("b", new Employee(johnDoe18, Collections.emptyList()));
 
         employeeDb.setValues(untypedEmployees);
     }
@@ -130,18 +133,21 @@ public class TypedEmployeeCachedStorageTest {
         System.out.println("Caching database type: " + currentMode);
         long startTime = System.currentTimeMillis();
         printTimeStamp("Start: ", startTime);
-        final CachingDataStorage.OutdatableResult<data.typed.Employee> empA = typedCache.getOutdatable("a");
+        final OutdatableResult<data.typed.Employee> empA = typedCache.getOutdatable("a");       // Outdates after 100 ms
+        final OutdatableResult<data.typed.Employee> empB = typedCache.getOutdatable("b");       // Outdates after 1000 ms
         printTimeStamp("GetOutdatable returned: ", startTime);
 
-        assertThat("Outdated too soon", empA.getOutdated().isDone(), is(false));
+        assertThat("Outdated too soon", empA.getOutdated().isDone() || empB.getOutdated().isDone(), is(false));
 
         Thread.sleep(25);
         printTimeStamp("After 25 ms sleep: ", startTime);
 
-        final data.typed.Employee expected = new data.typed.Employee(johnGalt37, twoJobsT);
+        final data.typed.Employee expectedA = new data.typed.Employee(johnGalt37, twoJobsT);
+        final data.typed.Employee expectedB = new data.typed.Employee(johnDoe18, Collections.emptyList());
 
         assertThat("Not done", empA.getResult().isDone(), is(true));
-        assertThat("Wrong result", empA.getResult().get(), is(expected));
+        assertThat("Wrong result A", empA.getResult().get(), is(expectedA));
+        assertThat("Wrong result B", empB.getResult().get(), is(expectedB));
         assertThat("Outdated too soon", empA.getOutdated().isDone(), is(false));
         printTimeStamp("After assertions: ", startTime);
 
@@ -152,8 +158,14 @@ public class TypedEmployeeCachedStorageTest {
             }
             Thread.sleep(10);
         }
+        assertThat("A not outdated", empA.getOutdated().isDone(), is(true));
+        Thread.sleep(500);
+        printTimeStamp("Checking employee B again: ", startTime);
+        assertThat("Outdated too soon", empB.getOutdated().isDone(), is(false));
+
+        Thread.sleep(500);
+        assertThat("B not outdated", empB.getOutdated().isDone(), is(true));
         printTimeStamp("Final time: ", startTime);
-        assertThat("Not outdated", empA.getOutdated().isDone(), is(true));
     }
 
 }
