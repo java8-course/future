@@ -87,17 +87,18 @@ public class TypedEmployeeCachedStorageTest {
     @Test
     public void testGetTypedEmployee() throws InterruptedException, ExecutionException {
         final CachingDataStorage.OutdatableResult<data.typed.Employee> empA = typedCache.getOutdatable("a");
-        assertThat(empA.getOutdated().isDone(), is(false));
+        assertThat("Outdated to soon", empA.getOutdated().isDone(), is(false));
 
-        Thread.sleep(20);
+        Thread.sleep(50);
 
         final data.typed.Employee expected = new data.typed.Employee(johnGalt37, twoJobsT);
 
-        assertThat(empA.getResult().isDone(), is(true));
-        assertThat(empA.getResult().get(), is(expected));
-        assertThat(empA.getOutdated().isDone(), is(false));
+        assertThat("Not done", empA.getResult().isDone(), is(true));
+        System.out.println("Checking result");
+        assertThat("Wrong result", empA.getResult().get(), is(expected));
+        assertThat("Outdated to soon", empA.getOutdated().isDone(), is(false));
 
         Thread.sleep(100);
-        assertThat(empA.getOutdated().isDone(), is(true));
+        assertThat("Not oudated", empA.getOutdated().isDone(), is(true));
     }
 }
