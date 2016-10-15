@@ -37,7 +37,7 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
         final OutdatableResult<T> cacheResult = cache.putIfAbsent(key, outdatableResult);
 
         if (cacheResult == null) {
-            db.get(key).thenAccept(value -> {
+            db.get(key).whenComplete((value, exception) -> {
                 scheduledExecutorService.schedule(
                         () -> {
                             cache.remove(key, outdatableResult);
@@ -45,7 +45,11 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
                         },
                         timeout,
                         timeoutUnits);
-                result.complete(value);
+                if (exception==null) {
+                    result.complete(value);
+                } else {
+                    result.completeExceptionally(exception);
+                }
             });
             return outdatableResult;
         }
