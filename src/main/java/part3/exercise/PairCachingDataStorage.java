@@ -30,7 +30,7 @@ public class PairCachingDataStorage<K, T, K1, T1, K2, T2> implements CachingData
     public OutdatableResult<T> getOutdatable(K key) {
         final OutdatableResult<T1> response1 = storage1.getOutdatable(getKey1.apply(key));
         final OutdatableResult<T2> response2 = storage2.getOutdatable(getKey2.apply(key));
-        final CompletableFuture<Void> outdated = CompletableFuture.anyOf(response1.getOutdated(), response2.getOutdated()).thenApply(x -> null);
+        final CompletableFuture<Void> outdated = response1.getOutdated().applyToEither(response2.getOutdated(), x -> null);
 
         return new OutdatableResult<>(
                 response1.getResult().thenCombine(response2.getResult(), resultMapper.apply(key)),
