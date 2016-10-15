@@ -10,6 +10,8 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import part3.exercise.ComposeCachingDataStorage;
 import part3.exercise.ListCachingDataStorage;
 import part3.exercise.MappingCachingDataStorage;
@@ -25,10 +27,55 @@ import static java.util.stream.Collectors.toMap;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 
+@RunWith(Parameterized.class)
 public class TypedEmployeeCachedStorageTest {
     private static SlowCompletableFutureDb<Employee> employeeDb;
     private static SlowCompletableFutureDb<Employer> employerDb;
     private static SlowCompletableFutureDb<Position> positionDb;
+
+    private enum TestMode {CLASSIC, FUNCTIONAL}
+
+    @Parameterized.Parameters
+    public static Collection<TestMode> testModes() {
+        return Arrays.asList(TestMode.values());
+    }
+
+    private final CachingDataStorage<String, data.typed.Employee> typedCache;
+    private final TestMode currentMode;
+
+    public TypedEmployeeCachedStorageTest(TestMode testMode) {
+        final CachingDataStorageImpl<Employee> employeeCache =
+                new CachingDataStorageImpl<>(employeeDb, 1, TimeUnit.SECONDS);
+
+        final CachingDataStorageImpl<Employer> employerCache =
+                new CachingDataStorageImpl<>(employerDb, 2, TimeUnit.SECONDS);
+
+        final CachingDataStorageImpl<Position> positionCache =
+                new CachingDataStorageImpl<>(positionDb, 100, TimeUnit.MILLISECONDS);
+
+        switch (testMode) {
+            case CLASSIC:
+                typedCache =
+                        new TypedEmployeeCachedStorage(employeeCache, positionCache, employerCache);
+                break;
+            case FUNCTIONAL:
+                final CachingDataStorage<JobHistoryEntry, data.typed.JobHistoryEntry> JobHistoryEntryCache =
+                        new PairCachingDataStorage<>(employerCache, positionCache, JobHistoryEntry::getEmployer, JobHistoryEntry::getPosition,
+                                jobHistoryEntry -> (employer, position) -> new data.typed.JobHistoryEntry(position, employer, jobHistoryEntry.getDuration()));
+
+                final CachingDataStorage<List<JobHistoryEntry>, List<data.typed.JobHistoryEntry>> JobHistoryListCache =
+                        new ListCachingDataStorage<>(JobHistoryEntryCache);
+
+                final CachingDataStorage<Employee, data.typed.Employee> employeeToTypedCache =
+                        new MappingCachingDataStorage<>(JobHistoryListCache, Employee::getJobHistory, (e, jl) -> new data.typed.Employee(e.getPerson(), jl));
+
+                typedCache = new ComposeCachingDataStorage<>(employeeCache, employeeToTypedCache, Function.identity());
+                break;
+            default:
+                throw new IllegalArgumentException("Unsupported test mode");
+        }
+        currentMode = testMode;
+    }
 
     @BeforeClass
     public static void defore() {
@@ -65,9 +112,6 @@ public class TypedEmployeeCachedStorageTest {
     private data.typed.JobHistoryEntry jobQAGoogleT = new data.typed.JobHistoryEntry(Position.QA, Employer.Google, 2);
     private List<data.typed.JobHistoryEntry> twoJobsT = new ArrayList<>(Arrays.asList(jobDevEpamT, jobQAGoogleT));
 
-    private TypedEmployeeCachedStorage typedCache;
-    private CachingDataStorage<String, data.typed.Employee> functionalTypedCache;
-
     @Before
     public void setupEmployeeDB() {
         final HashMap<String, Employee> untypedEmployees = new HashMap<>();
@@ -75,30 +119,6 @@ public class TypedEmployeeCachedStorageTest {
         untypedEmployees.put("a", new Employee(johnGalt37, twoJobs));
 
         employeeDb.setValues(untypedEmployees);
-
-        final CachingDataStorageImpl<Employee> employeeCache =
-                new CachingDataStorageImpl<>(employeeDb, 1, TimeUnit.SECONDS);
-
-        final CachingDataStorageImpl<Employer> employerCache =
-                new CachingDataStorageImpl<>(employerDb, 2, TimeUnit.SECONDS);
-
-        final CachingDataStorageImpl<Position> positionCache =
-                new CachingDataStorageImpl<>(positionDb, 100, TimeUnit.MILLISECONDS);
-
-        typedCache =
-                new TypedEmployeeCachedStorage(employeeCache, positionCache, employerCache);
-
-        final CachingDataStorage<JobHistoryEntry, data.typed.JobHistoryEntry> JobHistoryEntryCache =
-                new PairCachingDataStorage<>(employerCache, positionCache, JobHistoryEntry::getEmployer, JobHistoryEntry::getPosition,
-                        jobHistoryEntry -> (employer, position) -> new data.typed.JobHistoryEntry(position, employer, jobHistoryEntry.getDuration()));
-
-        final CachingDataStorage<List<JobHistoryEntry>, List<data.typed.JobHistoryEntry>> JobHistoryListCache =
-                new ListCachingDataStorage<>(JobHistoryEntryCache);
-
-        final CachingDataStorage<Employee, data.typed.Employee> employeeToTypedCache =
-                new MappingCachingDataStorage<>(JobHistoryListCache, Employee::getJobHistory, (e, jl) -> new data.typed.Employee(e.getPerson(), jl));
-
-        functionalTypedCache = new ComposeCachingDataStorage<>(employeeCache, employeeToTypedCache, Function.identity());
     }
 
     private void printTimeStamp(String message, long relativeTo) {
@@ -107,9 +127,10 @@ public class TypedEmployeeCachedStorageTest {
 
     @Test
     public void testGetTypedEmployee() throws InterruptedException, ExecutionException {
+        System.out.println("Test mode: " + currentMode);
         long startTime = System.currentTimeMillis();
         printTimeStamp("Start: ", startTime);
-        final CachingDataStorage.OutdatableResult<data.typed.Employee> empA = functionalTypedCache.getOutdatable("a");
+        final CachingDataStorage.OutdatableResult<data.typed.Employee> empA = typedCache.getOutdatable("a");
         printTimeStamp("GetOutdatable returned: ", startTime);
 
         assertThat("Outdated too soon", empA.getOutdated().isDone(), is(false));
