@@ -27,8 +27,9 @@ public class ComposeCachingDataStorage<K1, T1, K2, T2> implements CachingDataSto
                 .thenApply(mapping)
                 .thenApply(storage2::getOutdatable)
                 .thenCompose(ort2 -> {
-                    ort2.getOutdated().thenApply(outdated::complete);
+                    ort2.getOutdated().thenAccept(outdated::complete);
                     return ort2.getResult();
-                }), outdated);
+                }),
+                outdated);
     }
 }

@@ -22,6 +22,8 @@ public class MappingCachingDataStorage<K, K1, T1, T> implements CachingDataStora
     @Override
     public OutdatableResult<T> getOutdatable(K key) {
         final OutdatableResult<T1> response = storage.getOutdatable(mapKey.apply(key));
-        return new OutdatableResult<>(response.getResult().thenApply(t1 -> mapValue.apply(key, t1)), response.getOutdated());
+        return new OutdatableResult<>(
+                response.getResult().thenApply(t1 -> mapValue.apply(key, t1)),
+                response.getOutdated());
     }
 }
