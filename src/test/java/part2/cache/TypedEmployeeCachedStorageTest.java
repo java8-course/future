@@ -89,7 +89,7 @@ public class TypedEmployeeCachedStorageTest {
         final CachingDataStorage.OutdatableResult<data.typed.Employee> empA = typedCache.getOutdatable("a");
         assertThat("Outdated to soon", empA.getOutdated().isDone(), is(false));
 
-        Thread.sleep(50);
+        Thread.sleep(20);
 
         final data.typed.Employee expected = new data.typed.Employee(johnGalt37, twoJobsT);
 

@@ -7,7 +7,7 @@ import data.typed.Position;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 public class TypedEmployeeCachedStorage implements CachingDataStorage<String, data.typed.Employee> {
@@ -24,16 +24,23 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
         this.employerStorage = employerStorage;
     }
 
-    private CompletableFuture<Employee> typedEmployee(data.Employee empl, ConcurrentLinkedQueue<CompletableFuture<Void>> outdated) {
+    private OutdatableResult<Employee> typedEmployee(data.Employee empl) {
         System.out.println("Requesting typed data for employee");
+        final int jobHistorySize = empl.getJobHistory().size();
+
+        // Tried to use concurrent list instead, then converting to array,
+        // but it was unpredictably slow and led to randomly slow outdating
+        final CompletableFuture[] outdated = new CompletableFuture[jobHistorySize * 2];
+        final AtomicInteger index = new AtomicInteger(0);
+
         final List<CompletableFuture<JobHistoryEntry>> futureJobs = empl.getJobHistory().parallelStream()
                 .map(jhe -> {
                     System.out.println("Request: employer " + jhe.getEmployer());
                     final OutdatableResult<Employer> employer = employerStorage.getOutdatable(jhe.getEmployer());
                     System.out.println("Request: position " + jhe.getPosition());
                     final OutdatableResult<Position> position = positionStorage.getOutdatable(jhe.getPosition());
-                    outdated.add(employer.getOutdated());
-                    outdated.add(position.getOutdated());
+                    outdated[index.getAndIncrement()] = employer.getOutdated();
+                    outdated[index.getAndIncrement()] = position.getOutdated();
 
                     return CompletableFuture.allOf(employer.getResult(), position.getResult())
                             .thenApply(v -> {
@@ -44,29 +51,36 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
 
 
         System.out.println("Returning typed completable future");
-        return CompletableFuture.allOf(futureJobs.toArray(new CompletableFuture[futureJobs.size()])).thenApply(v ->
+        final CompletableFuture<Employee> futureEmployee = CompletableFuture.allOf(futureJobs.toArray(new CompletableFuture[jobHistorySize])).thenApply(v ->
                 futureJobs.parallelStream().map(CompletableFuture::join).collect(Collectors.toList()))
                 .thenApply(jhl -> {
                     System.out.println("Creating typed employee");
                     return new Employee(empl.getPerson(), jhl);
                 });
+        return new OutdatableResult<>(futureEmployee, CompletableFuture.anyOf(outdated).thenApply(x -> null));
     }
 
     @Override
     public OutdatableResult<Employee> getOutdatable(String key) {
-        final ConcurrentLinkedQueue<CompletableFuture<Void>> outdated = new ConcurrentLinkedQueue<>();
-
         System.out.println("Requesting untyped data for employee");
         final OutdatableResult<data.Employee> untypedEmployee = employeeStorage.getOutdatable(key);
 
-        final CompletableFuture<Employee> futureEmployee = untypedEmployee.getResult()
-                .thenCompose(empl -> typedEmployee(empl, outdated));
+        final CompletableFuture<Void> eOutdated = untypedEmployee.getOutdated();
+        final CompletableFuture<Employee> eComplete = new CompletableFuture<>();
 
-        outdated.add(untypedEmployee.getOutdated());
-
-        final CompletableFuture<Object> anyOutdated = CompletableFuture.anyOf(outdated.toArray(new CompletableFuture[0]));
+        untypedEmployee.getResult()
+                .thenApply(this::typedEmployee)
+                .whenComplete((oe, t) -> {
+                    System.out.println("typedEmployee invocation complete");
+                    if (t != null) {
+                        eComplete.completeExceptionally(t);
+                    } else {
+                        oe.getResult().thenAccept(eComplete::complete);
+                        oe.getOutdated().thenAccept(eOutdated::complete);
+                    }
+                });
 
         System.out.println("Returning from getOutdatable");
-        return new OutdatableResult<>(futureEmployee, anyOutdated.thenRun(() -> System.out.println("Outdating")));
+        return new OutdatableResult<>(eComplete, eOutdated);
     }
 }
