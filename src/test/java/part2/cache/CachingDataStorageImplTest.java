@@ -5,10 +5,10 @@ import data.Person;
 import data.typed.Employer;
 import data.typed.Position;
 import db.SlowCompletableFutureDb;
-import part2.cache.CachingDataStorage.OutdatableResult;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import part2.cache.CachingDataStorage.OutdatableResult;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -83,5 +83,4 @@ public class CachingDataStorageImplTest {
 
         assertEquals(person2, result3.getResult().get().getPerson());
     }
-
 }

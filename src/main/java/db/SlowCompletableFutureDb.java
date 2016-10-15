@@ -30,7 +30,7 @@ public class SlowCompletableFutureDb<T> implements DataStorage<String, T>, Close
         final T value = values.get(key);
         final CompletableFuture<T> result = new CompletableFuture<T>();
 
-        final int timeout = ThreadLocalRandom.current().nextInt(maxTimeout);
+        final int timeout = ThreadLocalRandom.current().nextInt(maxTimeout) + 1;
 
         scheduledExecutorService.schedule(
                 () -> result.complete(value),
