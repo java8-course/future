@@ -59,15 +59,15 @@ public class TypedEmployeeCachedStorageTest {
                         new TypedEmployeeCachedStorage(employeeCache, positionCache, employerCache);
                 break;
             case FUNCTIONAL:
-                final CachingDataStorage<JobHistoryEntry, data.typed.JobHistoryEntry> JobHistoryEntryCache =
+                final CachingDataStorage<JobHistoryEntry, data.typed.JobHistoryEntry> jobHistoryEntryCache =
                         new PairCachingDataStorage<>(employerCache, positionCache, JobHistoryEntry::getEmployer, JobHistoryEntry::getPosition,
                                 jobHistoryEntry -> (employer, position) -> new data.typed.JobHistoryEntry(position, employer, jobHistoryEntry.getDuration()));
 
-                final CachingDataStorage<List<JobHistoryEntry>, List<data.typed.JobHistoryEntry>> JobHistoryListCache =
-                        new ListCachingDataStorage<>(JobHistoryEntryCache);
+                final CachingDataStorage<List<JobHistoryEntry>, List<data.typed.JobHistoryEntry>> jobHistoryListCache =
+                        new ListCachingDataStorage<>(jobHistoryEntryCache);
 
                 final CachingDataStorage<Employee, data.typed.Employee> employeeToTypedCache =
-                        new MappingCachingDataStorage<>(JobHistoryListCache, Employee::getJobHistory, (e, jl) -> new data.typed.Employee(e.getPerson(), jl));
+                        new MappingCachingDataStorage<>(jobHistoryListCache, Employee::getJobHistory, (e, jl) -> new data.typed.Employee(e.getPerson(), jl));
 
                 typedCache = new ComposeCachingDataStorage<>(employeeCache, employeeToTypedCache, Function.identity());
                 break;
@@ -78,7 +78,7 @@ public class TypedEmployeeCachedStorageTest {
     }
 
     @BeforeClass
-    public static void defore() {
+    public static void before() {
         final Map<String, Employer> employerMap =
                 Arrays.stream(Employer.values())
                         .collect(toMap(Employer::name, Function.identity()));
@@ -103,14 +103,14 @@ public class TypedEmployeeCachedStorageTest {
         }
     }
 
-    private Person johnGalt37 = new Person("John", "Galt", 37);
-    private JobHistoryEntry jobDevEpam = new JobHistoryEntry(3, "DEV", "EPAM");
-    private JobHistoryEntry jobQAGoogle = new JobHistoryEntry(2, "QA", "Google");
-    private List<JobHistoryEntry> twoJobs = new ArrayList<>(Arrays.asList(jobDevEpam, jobQAGoogle));
+    private final Person johnGalt37 = new Person("John", "Galt", 37);
+    private final JobHistoryEntry jobDevEpam = new JobHistoryEntry(3, "DEV", "EPAM");
+    private final JobHistoryEntry jobQAGoogle = new JobHistoryEntry(2, "QA", "Google");
+    private final List<JobHistoryEntry> twoJobs = new ArrayList<>(Arrays.asList(jobDevEpam, jobQAGoogle));
 
-    private data.typed.JobHistoryEntry jobDevEpamT = new data.typed.JobHistoryEntry(Position.DEV, Employer.EPAM, 3);
-    private data.typed.JobHistoryEntry jobQAGoogleT = new data.typed.JobHistoryEntry(Position.QA, Employer.Google, 2);
-    private List<data.typed.JobHistoryEntry> twoJobsT = new ArrayList<>(Arrays.asList(jobDevEpamT, jobQAGoogleT));
+    private final data.typed.JobHistoryEntry jobDevEpamT = new data.typed.JobHistoryEntry(Position.DEV, Employer.EPAM, 3);
+    private final data.typed.JobHistoryEntry jobQAGoogleT = new data.typed.JobHistoryEntry(Position.QA, Employer.Google, 2);
+    private final List<data.typed.JobHistoryEntry> twoJobsT = new ArrayList<>(Arrays.asList(jobDevEpamT, jobQAGoogleT));
 
     @Before
     public void setupEmployeeDB() {
@@ -127,7 +127,7 @@ public class TypedEmployeeCachedStorageTest {
 
     @Test
     public void testGetTypedEmployee() throws InterruptedException, ExecutionException {
-        System.out.println("Test mode: " + currentMode);
+        System.out.println("Caching database type: " + currentMode);
         long startTime = System.currentTimeMillis();
         printTimeStamp("Start: ", startTime);
         final CachingDataStorage.OutdatableResult<data.typed.Employee> empA = typedCache.getOutdatable("a");
