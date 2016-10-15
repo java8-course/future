@@ -25,7 +25,6 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
     }
 
     private OutdatableResult<Employee> typedEmployee(data.Employee empl) {
-        System.out.println("Requesting typed data for employee");
         final int jobHistorySize = empl.getJobHistory().size();
 
         // Tried to use concurrent list instead, then converting to array,
@@ -35,34 +34,24 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
 
         final List<CompletableFuture<JobHistoryEntry>> futureJobs = empl.getJobHistory().parallelStream()
                 .map(jhe -> {
-                    System.out.println("Request: employer " + jhe.getEmployer());
                     final OutdatableResult<Employer> employer = employerStorage.getOutdatable(jhe.getEmployer());
-                    System.out.println("Request: position " + jhe.getPosition());
                     final OutdatableResult<Position> position = positionStorage.getOutdatable(jhe.getPosition());
                     outdated[index.getAndIncrement()] = employer.getOutdated();
                     outdated[index.getAndIncrement()] = position.getOutdated();
 
                     return CompletableFuture.allOf(employer.getResult(), position.getResult())
-                            .thenApply(v -> {
-                                System.out.println("Constructing typed JHE");
-                                return new JobHistoryEntry(position.getResult().join(), employer.getResult().join(), jhe.getDuration());
-                            });
+                            .thenApply(v -> new JobHistoryEntry(position.getResult().join(), employer.getResult().join(), jhe.getDuration()));
                 }).collect(Collectors.toList());
 
 
-        System.out.println("Returning typed completable future");
         final CompletableFuture<Employee> futureEmployee = CompletableFuture.allOf(futureJobs.toArray(new CompletableFuture[jobHistorySize])).thenApply(v ->
                 futureJobs.parallelStream().map(CompletableFuture::join).collect(Collectors.toList()))
-                .thenApply(jhl -> {
-                    System.out.println("Creating typed employee");
-                    return new Employee(empl.getPerson(), jhl);
-                });
+                .thenApply(jhl -> new Employee(empl.getPerson(), jhl));
         return new OutdatableResult<>(futureEmployee, CompletableFuture.anyOf(outdated).thenApply(x -> null));
     }
 
     @Override
     public OutdatableResult<Employee> getOutdatable(String key) {
-        System.out.println("Requesting untyped data for employee");
         final OutdatableResult<data.Employee> untypedEmployee = employeeStorage.getOutdatable(key);
 
         final CompletableFuture<Void> eOutdated = untypedEmployee.getOutdated();
@@ -71,7 +60,6 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
         untypedEmployee.getResult()
                 .thenApply(this::typedEmployee)
                 .whenComplete((oe, t) -> {
-                    System.out.println("typedEmployee invocation complete");
                     if (t != null) {
                         eComplete.completeExceptionally(t);
                     } else {
@@ -80,7 +68,6 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
                     }
                 });
 
-        System.out.println("Returning from getOutdatable");
         return new OutdatableResult<>(eComplete, eOutdated);
     }
 }

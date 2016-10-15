@@ -84,21 +84,37 @@ public class TypedEmployeeCachedStorageTest {
                 new TypedEmployeeCachedStorage(employeeCache, positionCache, employerCache);
     }
 
+    private void printTimeStamp(String message, long relativeTo) {
+        System.out.println(message + (System.currentTimeMillis() - relativeTo));
+    }
+
     @Test
     public void testGetTypedEmployee() throws InterruptedException, ExecutionException {
+        long startTime = System.currentTimeMillis();
+        printTimeStamp("Start: ", startTime);
         final CachingDataStorage.OutdatableResult<data.typed.Employee> empA = typedCache.getOutdatable("a");
+        printTimeStamp("GetOutdatable returned: ", startTime);
+
         assertThat("Outdated to soon", empA.getOutdated().isDone(), is(false));
 
-        Thread.sleep(20);
+        Thread.sleep(25);
+        printTimeStamp("After 25 ms sleep: ", startTime);
 
         final data.typed.Employee expected = new data.typed.Employee(johnGalt37, twoJobsT);
 
         assertThat("Not done", empA.getResult().isDone(), is(true));
-        System.out.println("Checking result");
         assertThat("Wrong result", empA.getResult().get(), is(expected));
         assertThat("Outdated to soon", empA.getOutdated().isDone(), is(false));
+        printTimeStamp("After assertions: ", startTime);
 
-        Thread.sleep(100);
+        for (int i = 0; i < 12; i++) {          // Experimentally determined outdation time: 70 to 110 ms
+            if (empA.getOutdated().isDone()) {
+                System.out.printf("Outdated after %d ms\n", i * 10);
+                break;
+            }
+            Thread.sleep(10);
+        }
+        printTimeStamp("Final time: ", startTime);
         assertThat("Not oudated", empA.getOutdated().isDone(), is(true));
     }
 }
