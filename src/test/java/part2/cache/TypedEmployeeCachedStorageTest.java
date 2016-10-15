@@ -10,6 +10,10 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import part3.exercise.ComposeCachingDataStorage;
+import part3.exercise.ListCachingDataStorage;
+import part3.exercise.MappingCachingDataStorage;
+import part3.exercise.PairCachingDataStorage;
 
 import java.io.IOException;
 import java.util.*;
@@ -62,6 +66,7 @@ public class TypedEmployeeCachedStorageTest {
     private List<data.typed.JobHistoryEntry> twoJobsT = new ArrayList<>(Arrays.asList(jobDevEpamT, jobQAGoogleT));
 
     private TypedEmployeeCachedStorage typedCache;
+    private CachingDataStorage<String, data.typed.Employee> functionalTypedCache;
 
     @Before
     public void setupEmployeeDB() {
@@ -82,6 +87,18 @@ public class TypedEmployeeCachedStorageTest {
 
         typedCache =
                 new TypedEmployeeCachedStorage(employeeCache, positionCache, employerCache);
+
+        final CachingDataStorage<JobHistoryEntry, data.typed.JobHistoryEntry> JobHistoryEntryCache =
+                new PairCachingDataStorage<>(employerCache, positionCache, JobHistoryEntry::getEmployer, JobHistoryEntry::getPosition,
+                        jobHistoryEntry -> (employer, position) -> new data.typed.JobHistoryEntry(position, employer, jobHistoryEntry.getDuration()));
+
+        final CachingDataStorage<List<JobHistoryEntry>, List<data.typed.JobHistoryEntry>> JobHistoryListCache =
+                new ListCachingDataStorage<>(JobHistoryEntryCache);
+
+        final CachingDataStorage<Employee, data.typed.Employee> employeeToTypedCache =
+                new MappingCachingDataStorage<>(JobHistoryListCache, Employee::getJobHistory, (e, jl) -> new data.typed.Employee(e.getPerson(), jl));
+
+        functionalTypedCache = new ComposeCachingDataStorage<>(employeeCache, employeeToTypedCache, Function.identity());
     }
 
     private void printTimeStamp(String message, long relativeTo) {
@@ -92,10 +109,10 @@ public class TypedEmployeeCachedStorageTest {
     public void testGetTypedEmployee() throws InterruptedException, ExecutionException {
         long startTime = System.currentTimeMillis();
         printTimeStamp("Start: ", startTime);
-        final CachingDataStorage.OutdatableResult<data.typed.Employee> empA = typedCache.getOutdatable("a");
+        final CachingDataStorage.OutdatableResult<data.typed.Employee> empA = functionalTypedCache.getOutdatable("a");
         printTimeStamp("GetOutdatable returned: ", startTime);
 
-        assertThat("Outdated to soon", empA.getOutdated().isDone(), is(false));
+        assertThat("Outdated too soon", empA.getOutdated().isDone(), is(false));
 
         Thread.sleep(25);
         printTimeStamp("After 25 ms sleep: ", startTime);
@@ -104,7 +121,7 @@ public class TypedEmployeeCachedStorageTest {
 
         assertThat("Not done", empA.getResult().isDone(), is(true));
         assertThat("Wrong result", empA.getResult().get(), is(expected));
-        assertThat("Outdated to soon", empA.getOutdated().isDone(), is(false));
+        assertThat("Outdated too soon", empA.getOutdated().isDone(), is(false));
         printTimeStamp("After assertions: ", startTime);
 
         for (int i = 0; i < 12; i++) {          // Experimentally determined outdation time: 70 to 110 ms
@@ -115,6 +132,7 @@ public class TypedEmployeeCachedStorageTest {
             Thread.sleep(10);
         }
         printTimeStamp("Final time: ", startTime);
-        assertThat("Not oudated", empA.getOutdated().isDone(), is(true));
+        assertThat("Not outdated", empA.getOutdated().isDone(), is(true));
     }
+
 }
