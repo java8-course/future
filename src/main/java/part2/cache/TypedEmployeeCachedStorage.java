@@ -10,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
+@SuppressWarnings("WeakerAccess")
 public class TypedEmployeeCachedStorage implements CachingDataStorage<String, data.typed.Employee> {
 
     private final CachingDataStorage<String, data.Employee> employeeStorage;
@@ -55,19 +56,14 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
         final OutdatableResult<data.Employee> untypedEmployee = employeeStorage.getOutdatable(key);
 
         final CompletableFuture<Void> eOutdated = untypedEmployee.getOutdated();
-        final CompletableFuture<Employee> eComplete = new CompletableFuture<>();
 
-        untypedEmployee.getResult()
+        final CompletableFuture<Employee> eComplete = untypedEmployee.getResult()
                 .thenApply(this::typedEmployee)
-                .whenComplete((oe, t) -> {
-                    if (t != null) {
-                        eComplete.completeExceptionally(t);
-                    } else {
-                        oe.getResult().thenAccept(eComplete::complete);
-                        oe.getOutdated().thenAccept(eOutdated::complete);
-                    }
-                });
-
+                .thenCompose(eor -> {
+                            eor.getOutdated().thenApply(eOutdated::complete);
+                            return eor.getResult();
+                        }
+                );
         return new OutdatableResult<>(eComplete, eOutdated);
     }
 }
