@@ -10,7 +10,11 @@ public class SlowCompletableFutureDb<T> implements DataStorage<String, T>, Close
 
     private volatile Map<String, T> values;
     private final ScheduledExecutorService scheduledExecutorService =
-            Executors.newSingleThreadScheduledExecutor();
+            Executors.newSingleThreadScheduledExecutor((r) -> {
+                final Thread thread = Executors.defaultThreadFactory().newThread(r);
+                thread.setDaemon(true);
+                return thread;
+            });
     private int maxTimeout;
     private TimeUnit timeoutUnits;
 
