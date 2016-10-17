@@ -21,6 +21,7 @@ import static java.util.stream.Collectors.toMap;
 import static junit.framework.TestCase.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+@SuppressWarnings("Duplicates")
 public class TypedEmployeeCachedStorageTest {
     private static SlowCompletableFutureDb<Employee> employeeDb;
     private static SlowCompletableFutureDb<Employer> employerDb;
@@ -30,14 +31,13 @@ public class TypedEmployeeCachedStorageTest {
     private static final int EMPLOYEE_CACHE_TIMEOUT = 300;
     private static final int EMPLOYER_CACHE_TIMEOUT = 200;
     private static final int POSITION_CACHE_TIMEOUT = 100;
+    private static final Person person = new Person("John", "Galt", 66);
 
     private static TypedEmployeeCachedStorage typedCache;
 
     private static ArrayList<JobHistoryEntry> jobHistoryEntries = null;
-    private static Person person = new Person("John", "Galt", 66);
 
     @BeforeClass
-    @SuppressWarnings("Duplicates")
     public static void initializeDb() {
         final Map<String, Employer> employerMap =
                 Arrays.stream(Employer.values())
@@ -58,7 +58,6 @@ public class TypedEmployeeCachedStorageTest {
     }
 
     @AfterClass
-    @SuppressWarnings("Duplicates")
     public static void closeDb() {
         try {
             employerDb.close();
