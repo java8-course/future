@@ -40,7 +40,6 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
         // TODO Start timeout after receiving result in CompletableFuture, not after receiving CompletableFuture itself
 
         CompletableFuture<Void> outdated = new CompletableFuture<>();
-
         CompletableFuture<T> dbAnswer = new CompletableFuture<>();
 
         OutdatableResult<T> result =
@@ -56,6 +55,7 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
 
         CompletableFuture<T> actual = db.get(key);
         actual.thenAccept((t) -> {
+            dbAnswer.complete(t);
             scheduledExecutorService.schedule(
                     () -> {
                         cache.remove(key);
@@ -64,7 +64,6 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
                     timeout,
                     timeoutUnits
                 );
-            dbAnswer.complete(t);
         });
 
         return result;
