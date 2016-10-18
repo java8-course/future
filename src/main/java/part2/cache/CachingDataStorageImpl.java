@@ -1,5 +1,7 @@
 package part2.cache;
 
+import com.sun.corba.se.impl.orbutil.threadpool.*;
+import com.sun.corba.se.impl.orbutil.threadpool.TimeoutException;
 import db.DataStorage;
 import db.SlowCompletableFutureDb;
 
@@ -10,7 +12,6 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
     private final DataStorage<String, T> db;
     private final int timeout;
     private final TimeUnit timeoutUnits;
-    // TODO can we use Map<String, T> here? Why?
     private final ConcurrentMap<String, OutdatableResult<T>> cache = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduledExecutorService =
             Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
@@ -32,12 +33,32 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
 
     @Override
     public OutdatableResult<T> getOutdatable(String key) {
-        // TODO implement
-        // TODO use ScheduledExecutorService to remove outdated result from cache - see SlowCompletableFutureDb implementation
-        // TODO complete OutdatableResult::outdated after removing outdated result from cache
-        // TODO don't use obtrudeException on result - just don't
-        // TODO use remove(Object key, Object value) to remove target value
-        // TODO Start timeout after receiving result in CompletableFuture, not after receiving CompletableFuture itself
-        throw new UnsupportedOperationException();
+        CompletableFuture<T> tCompletableFuture = new CompletableFuture<>();
+        CompletableFuture<Void> outdated = new CompletableFuture<>();
+        OutdatableResult<T> outdatable = new OutdatableResult<>(tCompletableFuture, outdated);
+        OutdatableResult<T> outdatableResult = cache.putIfAbsent(key, outdatable);
+
+        if (outdatableResult != null) {
+            return outdatableResult;
+        }
+
+        db.get(key)
+                .whenComplete((t, throwable) -> {
+                    if (throwable != null) {
+                        tCompletableFuture.completeExceptionally(throwable);
+                    } else {
+                        tCompletableFuture.complete(t);
+                    }
+                    scheduledExecutorService.schedule(
+                            () -> {
+                                cache.remove(key, outdatable);
+                                outdated.complete(null);
+                            },
+                            timeout,
+                            timeoutUnits
+                    );
+                });
+
+        return outdatable;
     }
 }
