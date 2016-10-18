@@ -28,8 +28,9 @@ public class CachingDataStorageImplTest {
     private static SlowCompletableFutureDb<Employer> employerDb;
     private static SlowCompletableFutureDb<Position> positionDb;
 
+    @SuppressWarnings("Duplicates")
     @BeforeClass
-    public static void defore() {
+    public static void before() {
         final Map<String, Employer> employerMap =
                 Arrays.stream(Employer.values())
                         .collect(toMap(Employer::name, Function.identity()));
@@ -43,6 +44,7 @@ public class CachingDataStorageImplTest {
         employeeDb = new SlowCompletableFutureDb<>(new HashMap<>(), 1, TimeUnit.MILLISECONDS);
     }
 
+    @SuppressWarnings("Duplicates")
     @AfterClass
     public static void after() {
         try {
