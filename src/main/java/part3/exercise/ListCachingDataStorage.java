@@ -30,11 +30,11 @@ public class ListCachingDataStorage<K, T> implements CachingDataStorage<List<K>,
                         .map(CompletableFuture::join)
                         .collect(toList()));
 
-        final CompletableFuture<T>[] ocf = outdatableList.stream()
+        final CompletableFuture<Void>[] ocf = outdatableList.stream()
                 .map(OutdatableResult::getOutdated)
-                .toArray(i -> (CompletableFuture<T>[]) new CompletableFuture[i]);
+                .toArray(i -> (CompletableFuture<Void>[]) new CompletableFuture[i]);
         final CompletableFuture<Void> outdated = CompletableFuture.anyOf(ocf)
-                .thenRun(()->{});
+                .thenApply(x -> null);
 
         return new OutdatableResult<>(lcf, outdated);
     }
