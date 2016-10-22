@@ -1,7 +1,6 @@
 package part2.cache;
 
 import db.DataStorage;
-import db.SlowCompletableFutureDb;
 
 import java.util.concurrent.*;
 
@@ -10,7 +9,6 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
     private final DataStorage<String, T> db;
     private final int timeout;
     private final TimeUnit timeoutUnits;
-    // TODO can we use Map<String, T> here? Why?
     private final ConcurrentMap<String, OutdatableResult<T>> cache = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduledExecutorService =
             Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
@@ -32,12 +30,30 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
 
     @Override
     public OutdatableResult<T> getOutdatable(String key) {
-        // TODO implement
-        // TODO use ScheduledExecutorService to remove outdated result from cache - see SlowCompletableFutureDb implementation
-        // TODO complete OutdatableResult::outdated after removing outdated result from cache
-        // TODO don't use obtrudeException on result - just don't
-        // TODO use remove(Object key, Object value) to remove target value
-        // TODO Start timeout after receiving result in CompletableFuture, not after receiving CompletableFuture itself
-        throw new UnsupportedOperationException();
+
+        final CompletableFuture<T> result = new CompletableFuture<>();
+        final CompletableFuture<Void> outdated = new CompletableFuture<>();
+        final OutdatableResult<T> outdatableResult = new OutdatableResult<>(result, outdated);
+        final OutdatableResult<T> cacheResult = cache.putIfAbsent(key, outdatableResult);
+
+        if (cacheResult == null) {
+            db.get(key).whenComplete((value, exception) -> {
+                scheduledExecutorService.schedule(
+                        () -> {
+                            cache.remove(key, outdatableResult);
+                            outdated.complete(null);
+                        },
+                        timeout,
+                        timeoutUnits);
+                if (exception==null) {
+                    result.complete(value);
+                } else {
+                    result.completeExceptionally(exception);
+                }
+            });
+            return outdatableResult;
+        }
+        return cacheResult;
     }
+
 }
