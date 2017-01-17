@@ -1,3 +1,4 @@
+
 package part1.exercise;
 
 import org.junit.Test;
@@ -103,9 +104,9 @@ public class Methods {
 
     @Test
     public void foreachMapFlatMap() {
-        final CompletableFuture<Integer> future = null;
-        final CompletableFuture<Integer> future1 = null;
-        final CompletableFuture<String> future2 = null;
+        final CompletableFuture<Integer> future = CompletableFuture.completedFuture(1);
+        final CompletableFuture<Integer> future1 = CompletableFuture.completedFuture(1);
+        final CompletableFuture<String> future2 = CompletableFuture.completedFuture("1");
 
         // forEach
         final CompletableFuture<Void> thenAccept = future.thenAccept(System.out::println);
@@ -125,9 +126,9 @@ public class Methods {
 
     @Test
     public void allAnyOf() {
-        final CompletableFuture<Integer> future = null;
-        final CompletableFuture<Integer> future1 = null;
-        final CompletableFuture<String> future2 = null;
+        final CompletableFuture<Integer> future = CompletableFuture.completedFuture(1);
+        final CompletableFuture<Integer> future1 = CompletableFuture.completedFuture(1);
+        final CompletableFuture<String> future2 = CompletableFuture.completedFuture("1");
 
         // All of
         final CompletableFuture<Void> allOf = CompletableFuture.allOf(future, future1, future2);
