@@ -24,7 +24,7 @@ public class MappingCachingDataStorage<K, K1, T1, T> implements CachingDataStora
     public OutdatableResult<T> getOutdatable(K key) {
 
         return new OutdatableResult<>(CompletableFuture.completedFuture(mapValue.apply(key, storage.get(mapKey.apply(key)).join())),
-                new CompletableFuture<>());
+                storage.getOutdatable(mapKey.apply(key)).getOutdated());
 
     }
 }

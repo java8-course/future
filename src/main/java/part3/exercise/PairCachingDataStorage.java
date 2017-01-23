@@ -29,9 +29,10 @@ public class PairCachingDataStorage<K, T, K1, T1, K2, T2> implements CachingData
     @Override
     public OutdatableResult<T> getOutdatable(K key) {
 
-        return new OutdatableResult<>(CompletableFuture
+        return new OutdatableResult<T>(CompletableFuture
                 .completedFuture(resultMapper.apply(key).apply(storage1.get(getKey1.apply(key)).join(),
                         storage2.get(getKey2.apply(key)).join())),
-                new CompletableFuture<>());
+                CompletableFuture.anyOf(storage1.getOutdatable(getKey1.apply(key)).getOutdated(),
+                        storage2.getOutdatable(getKey2.apply(key)).getOutdated()).thenAccept(o -> {}));
     }
 }

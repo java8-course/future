@@ -2,7 +2,6 @@ package part3.exercise;
 
 import part2.cache.CachingDataStorage;
 
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 public class ComposeCachingDataStorage<K1, T1, K2, T2> implements CachingDataStorage<K1, T2> {
@@ -22,6 +21,7 @@ public class ComposeCachingDataStorage<K1, T1, K2, T2> implements CachingDataSto
     @Override
     public OutdatableResult<T2> getOutdatable(K1 key) {
 
-        return new OutdatableResult<T2>(storage2.get(storage1.get(key).thenApply(mapping).join()), new CompletableFuture<>());
+        return new OutdatableResult<T2>(storage2.get(storage1.get(key).thenApply(mapping).join()),
+                storage2.getOutdatable(storage1.get(key).thenApply(mapping).join()).getOutdated());
     }
 }
