@@ -21,7 +21,6 @@ public class ComposeCachingDataStorage<K1, T1, K2, T2> implements CachingDataSto
     @Override
     public OutdatableResult<T2> getOutdatable(K1 key) {
 
-        return new OutdatableResult<T2>(storage2.get(storage1.get(key).thenApply(mapping).join()),
-                storage2.getOutdatable(storage1.get(key).thenApply(mapping).join()).getOutdated());
+        return storage2.getOutdatable(storage1.get(key).thenApply(mapping).join());
     }
 }
