@@ -38,6 +38,26 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
         // TODO don't use obtrudeException on result - just don't
         // TODO use remove(Object key, Object value) to remove target value
         // TODO Start timeout after receiving result in CompletableFuture, not after receiving CompletableFuture itself
-        throw new UnsupportedOperationException();
+        CompletableFuture<T> res = new CompletableFuture<>();
+        CompletableFuture<Void> outdated = new CompletableFuture<>();
+        OutdatableResult<T> outResult = new OutdatableResult<>(res, outdated);
+        OutdatableResult<T> casheResult = cache.putIfAbsent(key, outResult);
+
+        if (casheResult != null) {
+            return casheResult;
+        }
+
+        db.get(key).whenComplete((v, thw) -> {
+            scheduledExecutorService.schedule(() -> {
+                cache.remove(key, outResult);
+                outdated.complete(null);
+            }, timeout, timeoutUnits);
+            if ( null == thw) {
+                res.complete(v);
+            } else {
+                res.completeExceptionally(thw);
+            }
+        });
+        return outResult;
     }
 }
