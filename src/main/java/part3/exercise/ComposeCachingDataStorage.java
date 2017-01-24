@@ -2,6 +2,8 @@ package part3.exercise;
 
 import part2.cache.CachingDataStorage;
 
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 import java.util.function.Function;
 
 public class ComposeCachingDataStorage<K1, T1, K2, T2> implements CachingDataStorage<K1, T2> {
@@ -18,9 +20,30 @@ public class ComposeCachingDataStorage<K1, T1, K2, T2> implements CachingDataSto
         this.mapping = mapping;
     }
 
+    private BiConsumer<Void, Throwable> completeOutdated(CompletableFuture<Void> voidCompletableFuture) {
+        return (v, e) -> {
+            if (e != null) {
+                voidCompletableFuture.completeExceptionally(e);
+            }
+            else {
+                voidCompletableFuture.complete(null);
+            }
+        };
+    }
+
+
     @Override
     public OutdatableResult<T2> getOutdatable(K1 key) {
 
-        return storage2.getOutdatable(storage1.get(key).thenApply(mapping).join());
+        final CompletableFuture<Void> outdated = new CompletableFuture<>();
+
+        final OutdatableResult<T1> t1OutdatableResult = storage1.getOutdatable(key);
+        final OutdatableResult<T2> t2OutdatableResult =
+                storage2.getOutdatable(t1OutdatableResult.getResult().thenApply(mapping).join());
+
+        t1OutdatableResult.getOutdated().whenComplete(completeOutdated(outdated));
+        t2OutdatableResult.getOutdated().whenComplete(completeOutdated(outdated));
+
+        return new OutdatableResult<T2>(t2OutdatableResult.getResult(), outdated);
     }
 }

@@ -17,11 +17,17 @@ public class ListCachingDataStorage<K, T> implements CachingDataStorage<List<K>,
     @Override
     public OutdatableResult<List<T>> getOutdatable(List<K> key) {
 
-        return new OutdatableResult<List<T>>(CompletableFuture.completedFuture(key.stream().map(k -> storage.get(k).join()).collect(Collectors.toList())),
-                CompletableFuture.anyOf(key.stream()
-                        .map(k -> storage.getOutdatable(k).getOutdated())
-                        .collect(Collectors.toList()).toArray(new CompletableFuture[0]))
-                        .thenAccept(o -> {}));
+        final List<OutdatableResult<T>> outdatableResults = key.stream()
+                .map(storage::getOutdatable)
+                .collect(Collectors.toList());
 
+        return new OutdatableResult<List<T>>(CompletableFuture.completedFuture(outdatableResults.stream()
+                .map(or -> or.getResult().join())
+                .collect(Collectors.toList())),
+
+                CompletableFuture.anyOf(outdatableResults.stream()
+                                        .map(OutdatableResult::getOutdated)
+                                        .toArray(i -> (CompletableFuture<Void>[]) new CompletableFuture[i]))
+                        .thenAccept(o -> {}));
     }
 }

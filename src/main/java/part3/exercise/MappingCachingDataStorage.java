@@ -3,6 +3,7 @@ package part3.exercise;
 import part2.cache.CachingDataStorage;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -23,8 +24,9 @@ public class MappingCachingDataStorage<K, K1, T1, T> implements CachingDataStora
     @Override
     public OutdatableResult<T> getOutdatable(K key) {
 
-        return new OutdatableResult<>(CompletableFuture.completedFuture(mapValue.apply(key, storage.get(mapKey.apply(key)).join())),
-                storage.getOutdatable(mapKey.apply(key)).getOutdated());
+        final OutdatableResult<T1> t1OutdatableResult = storage.getOutdatable(mapKey.apply(key));
 
+        return new OutdatableResult<>(CompletableFuture.completedFuture(mapValue.apply(key, t1OutdatableResult.getResult().join())),
+                t1OutdatableResult.getOutdated());
     }
 }
