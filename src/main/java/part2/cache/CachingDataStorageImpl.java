@@ -39,22 +39,25 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
         // TODO don't use obtrudeException on result - just don't
         // TODO use remove(Object key, Object value) to remove target value
         // TODO Start timeout after receiving result in CompletableFuture, not after receiving CompletableFuture itself
-        return cache.computeIfAbsent(key, s -> {
-            final CompletableFuture<Void> outdatedCF = new CompletableFuture<>();
-            final CompletableFuture<T> resultCF = new CompletableFuture<>();
-            final OutdatableResult<T> result = new OutdatableResult<>(resultCF,outdatedCF);
-            db.get(key).whenComplete((t,ex) -> {
-                if (ex != null){
-                    resultCF.completeExceptionally(ex);
-                } else {
-                    resultCF.complete(t);
-                }
-                scheduledExecutorService.schedule(() -> {
-                    cache.remove(s,result);
-                    outdatedCF.complete(null);
-                },timeout,timeoutUnits);
-            });
-            return result;
+        final OutdatableResult<T> oldResult = cache.get(key);
+        if (oldResult != null) {
+            return oldResult;
+        }
+        final CompletableFuture<Void> outdatedCF = new CompletableFuture<>();
+        final CompletableFuture<T> resultCF = new CompletableFuture<>();
+        final OutdatableResult<T> newResult = new OutdatableResult<>(resultCF, outdatedCF);
+        cache.put(key, newResult);
+        db.get(key).whenComplete((t, ex) -> {
+            if (ex != null) {
+                resultCF.completeExceptionally(ex);
+            } else {
+                resultCF.complete(t);
+            }
+            scheduledExecutorService.schedule(() -> {
+                cache.remove(key, newResult);
+                outdatedCF.complete(null);
+            }, timeout, timeoutUnits);
         });
+        return newResult;
     }
 }
