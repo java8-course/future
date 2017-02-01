@@ -144,7 +144,7 @@ public class CompletableFutureBasics {
         final Optional<Person> optPerson = Optional.of(person);
 
         // TODO get Optional<first name> from optPerson
-        final Optional<String> optFirstName = Optional.of(person.getFirstName());
+        final Optional<String> optFirstName = optPerson.map(Person::getFirstName);
 
         assertEquals(person.getFirstName(), optFirstName.get());
 
@@ -152,7 +152,7 @@ public class CompletableFutureBasics {
         final Stream<Person> streamPerson = Stream.of(person);
 
         // TODO Get Stream<first name> from streamPerson
-        final Stream<String> streamFirstName = streamPerson.flatMap(p -> Stream.of(p.getFirstName()));
+        final Stream<String> streamFirstName = streamPerson.map(Person::getFirstName);
 
         assertEquals(person.getFirstName(), streamFirstName.collect(toList()).get(0));
 
@@ -160,8 +160,7 @@ public class CompletableFutureBasics {
         final CompletableFuture<Person> futurePerson = CompletableFuture.completedFuture(person);
 
         // TODO Get CompletableFuture<first name> from futurePerson
-        final CompletableFuture<String> futureFirstName =
-                CompletableFuture.completedFuture(futurePerson.get().getFirstName());
+        final CompletableFuture<String> futureFirstName = futurePerson.thenApply(Person::getFirstName);
 
         assertEquals(person.getFirstName(), futureFirstName.get());
     }
