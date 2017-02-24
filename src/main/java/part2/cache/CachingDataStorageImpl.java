@@ -1,7 +1,6 @@
 package part2.cache;
 
 import db.DataStorage;
-import db.SlowCompletableFutureDb;
 
 import java.util.concurrent.*;
 
@@ -38,6 +37,22 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
         // TODO don't use obtrudeException on result - just don't
         // TODO use remove(Object key, Object value) to remove target value
         // TODO Start timeout after receiving result in CompletableFuture, not after receiving CompletableFuture itself
-        throw new UnsupportedOperationException();
+        CompletableFuture<T> result = new CompletableFuture<>();
+        CompletableFuture<Void> outdated = new CompletableFuture<>();
+        OutdatableResult<T> outResult = new OutdatableResult<>(result, outdated);
+        OutdatableResult<T> cacheResult = cache.putIfAbsent(key, outResult);
+
+        if (cacheResult != null) {
+            return cacheResult;
+        }
+        db.get(key).whenComplete((e, r) -> {
+            if ( null == r) result.complete(e);
+            else result.completeExceptionally(r);
+            scheduledExecutorService.schedule(() -> {
+                cache.remove(key, outResult);
+                outdated.complete(null);
+            }, timeout, timeoutUnits);
+        });
+        return outResult;
     }
 }
