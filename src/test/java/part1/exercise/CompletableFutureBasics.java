@@ -60,21 +60,19 @@ public class CompletableFutureBasics {
     public void createNonEmpty() throws ExecutionException, InterruptedException {
         final Person person = new Person("John", "Galt", 33);
 
-        // TODO Create non empty Optional
-        final Optional<Person> optPerson = null;
+        final Optional<Person> optPerson = Optional.of(person);
 
         assertTrue(optPerson.isPresent());
         assertEquals(person, optPerson.get());
 
-        // TODO Create stream with a single element
-        final Stream<Person> streamPerson = null;
+        final Stream<Person> streamPerson = Stream.of(person);
 
         final List<Person> persons = streamPerson.collect(toList());
         assertThat(persons.size(), is(1));
         assertEquals(person, persons.get(0));
 
-        // TODO Create completed CompletableFuture
-        final CompletableFuture<Person> futurePerson = null;
+        final CompletableFuture<Person> futurePerson = new CompletableFuture<>();
+        futurePerson.complete(person);
 
         assertTrue(futurePerson.isDone());
         assertEquals(person, futurePerson.get());
@@ -82,20 +80,18 @@ public class CompletableFutureBasics {
 
     @Test
     public void createEmpty() throws ExecutionException, InterruptedException {
-        // TODO Create empty Optional
-        final Optional<Person> optPerson = null;
+        final Optional<Person> optPerson = Optional.empty();
 
         assertFalse(optPerson.isPresent());
 
-        // TODO Create empty stream
-        final Stream<Person> streamPerson = null;
+        final Stream<Person> streamPerson = Stream.empty();
 
         final List<Person> persons = streamPerson.collect(toList());
         assertThat(persons.size(), is(0));
 
         // TODO Complete CompletableFuture with NoSuchElementException
-        final CompletableFuture<Person> futurePerson = null;
-        // futurePerson.???
+        final CompletableFuture<Person> futurePerson = new CompletableFuture<>();
+        futurePerson.complete(null);
 
         assertTrue(futurePerson.isCompletedExceptionally());
         assertTrue(futurePerson
