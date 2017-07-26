@@ -4,6 +4,8 @@ import data.typed.Employee;
 import data.typed.Employer;
 import data.typed.Position;
 
+import java.util.concurrent.CompletableFuture;
+
 public class TypedEmployeeCachedStorage implements CachingDataStorage<String, data.typed.Employee> {
 
     private final CachingDataStorage<String, data.Employee> employeeStorage;
@@ -21,6 +23,9 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
     @Override
     public OutdatableResult<Employee> getOutdatable(String key) {
         // TODO note that you don't know timeouts for different storage. And timeouts can be different.
+
+        final CompletableFuture<data.Employee> employeeCompletableFuture = employeeStorage.get(key);
+
         throw new UnsupportedOperationException();
     }
 }
