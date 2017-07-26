@@ -1,5 +1,6 @@
 package part2.cache;
 
+import com.sun.javafx.geom.AreaOp;
 import db.DataStorage;
 import db.SlowCompletableFutureDb;
 
@@ -38,6 +39,30 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
         // TODO don't use obtrudeException on result - just don't
         // TODO use remove(Object key, Object value) to remove target value
         // TODO Start timeout after receiving result in CompletableFuture, not after receiving CompletableFuture itself
-        throw new UnsupportedOperationException();
+
+        OutdatableResult<T> res = new OutdatableResult<>(new CompletableFuture<>(), new CompletableFuture<>());
+        OutdatableResult<T> tOutdatableResult = cache.putIfAbsent(key, res);
+
+        if (tOutdatableResult == null) {
+            db.get(key).whenComplete(
+                    (t, e) -> {
+                        if (e != null) {
+                            res.getResult().completeExceptionally(e);
+                        } else {
+                            res.getResult().complete(t);
+                        }
+                        scheduledExecutorService.schedule(() -> {
+                                    cache.remove(key, cache.get(key));
+                                    res.getOutdated().complete(null);
+                                },
+                                timeout,
+                                timeoutUnits
+                        );
+                    }
+            );
+            return res;
+        } else {
+            return tOutdatableResult;
+        }
     }
 }
