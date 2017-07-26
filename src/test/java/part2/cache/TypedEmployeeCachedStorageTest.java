@@ -77,21 +77,23 @@ public class TypedEmployeeCachedStorageTest {
 
         final CachingDataStorage.OutdatableResult<data.typed.Employee> aPerson = typedCache.getOutdatable("a");
 
-        assertEquals(aPerson.getResult().get().getPerson(), person1);
+        assertEquals(aPerson.getResult().get().getPerson(), employeeCache.get("a").get().getPerson());
         assertEquals(aPerson.getResult().get().getJobHistoryEntries(),
                 Collections.singletonList(new data.typed.JobHistoryEntry(Position.BA, Employer.EPAM, 1)));
 
-        Thread.sleep(500);
+        Thread.sleep(50);
+
         employeeTmp = new HashMap<>();
         final Person person2 = new Person("Dagni", "Taggart", 30);
         employeeTmp.put("a", new Employee(person2, Collections.emptyList()));
         employeeDb.setValues(employeeTmp);
 
         final CachingDataStorage.OutdatableResult<data.typed.Employee> aPerson2 = typedCache.getOutdatable("a");
-        assertEquals(aPerson2.getResult().get().getPerson(), person1);
+        assertEquals(aPerson2.getResult().get().getPerson(), employeeCache.get("a").get().getPerson());
 
-        Thread.sleep(500);
+        Thread.sleep(100);
         final CachingDataStorage.OutdatableResult<data.typed.Employee> aPerson3 = typedCache.getOutdatable("a");
-        assertEquals(aPerson3.getResult().get().getPerson(), person2);
+
+        assertEquals(aPerson3.getResult().get().getPerson(), employeeCache.get("a").get().getPerson());
     }
 }
