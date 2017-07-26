@@ -71,9 +71,7 @@ public class CompletableFutureBasics {
         assertThat(persons.size(), is(1));
         assertEquals(person, persons.get(0));
 
-        final CompletableFuture<Person> futurePerson = new CompletableFuture<>();
-        futurePerson.complete(person);
-
+        final CompletableFuture<Person> futurePerson = CompletableFuture.completedFuture(person);
         assertTrue(futurePerson.isDone());
         assertEquals(person, futurePerson.get());
     }
@@ -115,8 +113,7 @@ public class CompletableFutureBasics {
         streamPerson.forEach(result2::complete);
         assertEquals(person, result2.get());
 
-        final CompletableFuture<Person> futurePerson = new CompletableFuture<>();
-        futurePerson.complete(person);
+        final CompletableFuture<Person> futurePerson = CompletableFuture.completedFuture(person);
 
         final CompletableFuture<Person> result3 = new CompletableFuture<>();
 
@@ -140,8 +137,7 @@ public class CompletableFutureBasics {
 
         assertEquals(person.getFirstName(), streamFirstName.collect(toList()).get(0));
 
-        final CompletableFuture<Person> futurePerson = new CompletableFuture<>();
-        futurePerson.complete(person);
+        final CompletableFuture<Person> futurePerson = CompletableFuture.completedFuture(person);
 
         final CompletableFuture<String> futureFirstName = futurePerson.thenApply(Person::getFirstName);
 
@@ -166,8 +162,7 @@ public class CompletableFutureBasics {
         final int[] codePointsArray = codePoints.toArray();
         assertEquals(person.getFirstName(), new String(codePointsArray, 0, codePointsArray.length));
 
-        final CompletableFuture<Person> futurePerson = new CompletableFuture<>();
-        futurePerson.complete(person);
+        final CompletableFuture<Person> futurePerson = CompletableFuture.completedFuture(person);
 
         final CompletableFuture<Employee> futureEmployee = futurePerson.thenCompose(s->employeeDb.get(getKeyByPerson(s)));
 
