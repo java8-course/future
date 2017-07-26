@@ -57,7 +57,7 @@ public class CachingDataStorageImplTest {
     @Test
     public void expiration() throws InterruptedException, ExecutionException, TimeoutException {
         final CachingDataStorageImpl<Employee> employeeCache =
-                new CachingDataStorageImpl<>(employeeDb, 10, TimeUnit.MILLISECONDS);
+                new CachingDataStorageImpl<>(employeeDb, 100, TimeUnit.MILLISECONDS);
 
         Map<String, Employee> values = new HashMap<>();
         final Person person1 = new Person("John", "Galt", 66);
