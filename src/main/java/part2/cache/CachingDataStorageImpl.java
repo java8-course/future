@@ -44,19 +44,20 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
         OutdatableResult<T> tOutdatableResult = cache.putIfAbsent(key, res);
 
         if (tOutdatableResult == null) {
-
             db.get(key).whenComplete(
-                    (t,e) -> {
-                        if (e == null) {
-                            res.getResult().complete(t);
-                        } else {
+                    (t, e) -> {
+                        if (e != null) {
                             res.getResult().completeExceptionally(e);
+                        } else {
+                            res.getResult().complete(t);
                         }
-                        res.getOutdated().thenRunAsync(() -> scheduledExecutorService.schedule(
-                                () -> cache.remove(key, cache.get(key)),
+                        scheduledExecutorService.schedule(() -> {
+                                    cache.remove(key, cache.get(key));
+                                    res.getOutdated().complete(null);
+                                },
                                 timeout,
                                 timeoutUnits
-                        ));
+                        );
                     }
             );
             return res;
