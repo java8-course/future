@@ -1,6 +1,8 @@
 package part2.cache;
 
 import data.Employee;
+import data.JobHistoryEntry;
+import data.Person;
 import data.typed.Employer;
 import data.typed.Position;
 import db.SlowCompletableFutureDb;
@@ -10,17 +12,21 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
 import static java.util.stream.Collectors.toMap;
+import static org.junit.Assert.assertEquals;
 
 public class TypedEmployeeCachedStorageTest {
     private static SlowCompletableFutureDb<Employee> employeeDb;
     private static SlowCompletableFutureDb<Employer> employerDb;
     private static SlowCompletableFutureDb<Position> positionDb;
+
 
     @BeforeClass
     public static void defore() {
@@ -49,7 +55,7 @@ public class TypedEmployeeCachedStorageTest {
     }
 
     @Test
-    public void expiration() {
+    public void expiration() throws ExecutionException, InterruptedException {
         final CachingDataStorageImpl<Employee> employeeCache =
                 new CachingDataStorageImpl<>(employeeDb, 1, TimeUnit.SECONDS);
 
@@ -59,9 +65,33 @@ public class TypedEmployeeCachedStorageTest {
         final CachingDataStorageImpl<Position> positionCache =
                 new CachingDataStorageImpl<>(positionDb, 100, TimeUnit.MILLISECONDS);
 
+        Map<String, Employee> employeeTmp = new HashMap<>();
+
+        final Person person1 = new Person("John", "Doe", 30);
+        employeeTmp.put("a", new Employee(person1,
+                Collections.singletonList(new JobHistoryEntry(1, Position.BA.name(), Employer.EPAM.name()))));
+        employeeDb.setValues(employeeTmp);
+
         final TypedEmployeeCachedStorage typedCache =
                 new TypedEmployeeCachedStorage(employeeCache, positionCache, employerCache);
 
-        // TODO check than cache gets outdated with the firs outdated inner cache
+        final CachingDataStorage.OutdatableResult<data.typed.Employee> aPerson = typedCache.getOutdatable("a");
+
+        assertEquals(aPerson.getResult().get().getPerson(), person1);
+        assertEquals(aPerson.getResult().get().getJobHistoryEntries(),
+                Collections.singletonList(new data.typed.JobHistoryEntry(Position.BA, Employer.EPAM, 1)));
+
+        Thread.sleep(500);
+        employeeTmp = new HashMap<>();
+        final Person person2 = new Person("Dagni", "Taggart", 30);
+        employeeTmp.put("a", new Employee(person2, Collections.emptyList()));
+        employeeDb.setValues(employeeTmp);
+
+        final CachingDataStorage.OutdatableResult<data.typed.Employee> aPerson2 = typedCache.getOutdatable("a");
+        assertEquals(aPerson2.getResult().get().getPerson(), person1);
+
+        Thread.sleep(500);
+        final CachingDataStorage.OutdatableResult<data.typed.Employee> aPerson3 = typedCache.getOutdatable("a");
+        assertEquals(aPerson3.getResult().get().getPerson(), person2);
     }
 }
