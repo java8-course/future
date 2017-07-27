@@ -2,13 +2,23 @@ package part2.cache;
 
 import data.typed.Employee;
 import data.typed.Employer;
+import data.typed.JobHistoryEntry;
 import data.typed.Position;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+import java.util.function.Function;
+
+import static java.util.stream.Collectors.toList;
 
 public class TypedEmployeeCachedStorage implements CachingDataStorage<String, data.typed.Employee> {
 
     private final CachingDataStorage<String, data.Employee> employeeStorage;
     private final CachingDataStorage<String, Position> positionStorage;
     private final CachingDataStorage<String, Employer> employerStorage;
+
 
     public TypedEmployeeCachedStorage(CachingDataStorage<String, data.Employee> employeeStorage,
                                       CachingDataStorage<String, Position> positionStorage,
@@ -18,9 +28,69 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
         this.employerStorage = employerStorage;
     }
 
+    private OutdatableResult<Employee> asyncToTyped(data.Employee e) {
+
+        final List<CompletableFuture<JobHistoryEntry>> jobHistoryFutures =
+                e.getJobHistory().stream()
+                        .map(this::asyncToTyped)
+                        .collect(toList());
+
+        final List<CompletableFuture> outdatedList = e.getJobHistory().stream()
+                .map(this::getOutDated)
+                .collect(toList());
+
+
+        return new OutdatableResult<>(
+                CompletableFuture.allOf(jobHistoryFutures.toArray(new CompletableFuture[0]))
+                        .thenApplyAsync(x -> {
+                            final List<JobHistoryEntry> jobHistory = jobHistoryFutures.stream()
+                                    .map(this::getOrNull)
+                                    .collect(toList());
+                            return new data.typed.Employee(e.getPerson(), jobHistory);
+                        })
+                        .thenApply(Function.identity()),
+                CompletableFuture.anyOf(outdatedList.toArray(new CompletableFuture[0]))
+                        .thenApply(x -> null)
+        );
+    }
+
+    private CompletableFuture<JobHistoryEntry> asyncToTyped(data.JobHistoryEntry j) {
+        return employerStorage.get(j.getEmployer())
+                .thenCombine(
+                        positionStorage.get(j.getPosition()),
+                        (e, p) -> new JobHistoryEntry(p, e, j.getDuration()));
+    }
+
+    private CompletableFuture getOutDated(data.JobHistoryEntry j) {
+        return CompletableFuture.anyOf(positionStorage.getOutdatable(j.getPosition()).getOutdated(),
+                employerStorage.getOutdatable(j.getEmployer()).getOutdated());
+    }
+
+    private <T> T getOrNull(Future<T> f) {
+        try {
+            return f.get();
+        } catch (InterruptedException | ExecutionException e1) {
+            e1.printStackTrace();
+            return null;
+        }
+    }
+
     @Override
     public OutdatableResult<Employee> getOutdatable(String key) {
-        // TODO note that you don't know timeouts for different storage. And timeouts can be different.
-        throw new UnsupportedOperationException();
+        final OutdatableResult<data.Employee> outdatable = employeeStorage.getOutdatable(key);
+
+        final CompletableFuture<OutdatableResult<Employee>> future = outdatable.getResult().thenApply(this::asyncToTyped);
+        final OutdatableResult<Employee> result = new OutdatableResult<>(new CompletableFuture<>(), new CompletableFuture<>());
+        future.whenComplete((res, ex) -> {
+            if (ex != null) {
+                result.getResult().completeExceptionally(ex);
+//                result.getOutdated().completeExceptionally(ex);
+            } else {
+                result.getResult().complete(getOrNull(res.getResult()));
+                outdatable.getOutdated().runAfterEither(res.getOutdated(), () -> result.getOutdated().complete(null));
+            }
+        });
+        return result;
     }
 }
+
