@@ -39,15 +39,18 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
         OutdatableResult<T> cashedResult = cache.putIfAbsent(key, outdatableResult);
         if (cashedResult == null) {
             db.get(key).whenComplete((result, throwable) -> {
-                if (throwable == null) resultFuture.complete(result);
-                else resultFuture.completeExceptionally(throwable);
+                if (throwable == null){
+                    resultFuture.complete(result);
+                }
+                else {
+                    resultFuture.completeExceptionally(throwable);
+                }
                 scheduledExecutorService.schedule(() -> {
-                    cache.remove(key, result);
+                    cache.remove(key, outdatableResult);
                     sched.complete(null);
                 }, timeout, timeoutUnits);
             });
             return outdatableResult;
         } else return cashedResult;
-        // FIXME: 7/26/2017 тесты валятся
     }
 }
