@@ -46,11 +46,6 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
         if (tOutdatableResult == null) {
             db.get(key).whenComplete(
                     (t, e) -> {
-                        if (e != null) {
-                            res.getResult().completeExceptionally(e);
-                        } else {
-                            res.getResult().complete(t);
-                        }
                         scheduledExecutorService.schedule(() -> {
                                     cache.remove(key, cache.get(key));
                                     res.getOutdated().complete(null);
@@ -58,6 +53,11 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
                                 timeout,
                                 timeoutUnits
                         );
+                        if (e != null) {
+                            res.getResult().completeExceptionally(e);
+                        } else {
+                            res.getResult().complete(t);
+                        }
                     }
             );
             return res;
