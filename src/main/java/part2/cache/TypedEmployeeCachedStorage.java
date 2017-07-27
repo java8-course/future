@@ -78,10 +78,19 @@ public class TypedEmployeeCachedStorage implements CachingDataStorage<String, da
     @Override
     public OutdatableResult<Employee> getOutdatable(String key) {
         final OutdatableResult<data.Employee> outdatable = employeeStorage.getOutdatable(key);
-        final CompletableFuture<Employee> employeeResult = outdatable.getResult().thenCompose(e -> asyncToTyped(e).getResult());
-        final CompletableFuture<Void> employeeOutdated = outdatable.getResult().thenCompose(e -> asyncToTyped(e).getOutdated());
-        outdatable.getResult().thenCompose(e -> asyncToTyped(e).getOutdated());
-        return new OutdatableResult<>(employeeResult, outdatable.getOutdated().applyToEither(employeeOutdated, Function.identity()));
+
+        final CompletableFuture<OutdatableResult<Employee>> future = outdatable.getResult().thenApply(this::asyncToTyped);
+        final OutdatableResult<Employee> result = new OutdatableResult<>(new CompletableFuture<>(), new CompletableFuture<>());
+        future.whenComplete((res, ex) -> {
+            if (ex != null) {
+                result.getResult().completeExceptionally(ex);
+//                result.getOutdated().completeExceptionally(ex);
+            } else {
+                result.getResult().complete(getOrNull(res.getResult()));
+                outdatable.getOutdated().runAfterEither(res.getOutdated(), () -> result.getOutdated().complete(null));
+            }
+        });
+        return result;
     }
 }
 
