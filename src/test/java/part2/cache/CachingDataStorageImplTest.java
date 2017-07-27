@@ -55,7 +55,7 @@ public class CachingDataStorageImplTest {
     }
 
     @Test
-    public void expiration() throws InterruptedException, ExecutionException, TimeoutException {
+    public void expirationEmployee() throws InterruptedException, ExecutionException, TimeoutException {
         final CachingDataStorageImpl<Employee> employeeCache =
                 new CachingDataStorageImpl<>(employeeDb, 100, TimeUnit.MILLISECONDS);
 
@@ -82,6 +82,66 @@ public class CachingDataStorageImplTest {
         final OutdatableResult<Employee> result3 = employeeCache.getOutdatable("a");
 
         assertEquals(person2, result3.getResult().get().getPerson());
+    }
+
+    @Test
+    public void expirationEmployer() throws InterruptedException, ExecutionException, TimeoutException {
+        final CachingDataStorageImpl<Employer> employerCache =
+                new CachingDataStorageImpl<>(employerDb, 100, TimeUnit.MILLISECONDS);
+
+        Map<String, Employer> values = new HashMap<>();
+        Employer google = Employer.Google;
+        values.put("a", google);
+        employerDb.setValues(values);
+
+        final OutdatableResult<Employer> result1 = employerCache.getOutdatable("a");
+
+        values = new HashMap<>();
+        Employer yandex = Employer.Yandex;
+        values.put("a", yandex);
+        employerDb.setValues(values);
+
+        Thread.sleep(10);
+        final OutdatableResult<Employer> result2 = employerCache.getOutdatable("a");
+
+        assertEquals(google, result1.getResult().get());
+        assertEquals(result1.getResult().get(), result2.getResult().get());
+
+        result1.getOutdated().get(100, TimeUnit.MILLISECONDS);
+
+        OutdatableResult<Employer> result3 = employerCache.getOutdatable("a");
+
+        assertEquals(yandex, result3.getResult().get());
+    }
+
+    @Test
+    public void expirationPosition() throws InterruptedException, ExecutionException, TimeoutException {
+        final CachingDataStorageImpl<Position> employerCache =
+                new CachingDataStorageImpl<>(positionDb, 100, TimeUnit.MILLISECONDS);
+
+        Map<String, Position> values = new HashMap<>();
+        Position dev = Position.DEV;
+        values.put("a", dev);
+        positionDb.setValues(values);
+
+        final OutdatableResult<Position> result1 = employerCache.getOutdatable("a");
+
+        values = new HashMap<>();
+        Position devOps = Position.DevOps;
+        values.put("a", devOps);
+        positionDb.setValues(values);
+
+        Thread.sleep(10);
+        final OutdatableResult<Position> result2 = employerCache.getOutdatable("a");
+
+        assertEquals(dev, result1.getResult().get());
+        assertEquals(result1.getResult().get(), result2.getResult().get());
+
+        result1.getOutdated().get(100, TimeUnit.MILLISECONDS);
+
+        OutdatableResult<Position> result3 = employerCache.getOutdatable("a");
+
+        assertEquals(devOps, result3.getResult().get());
     }
 
 }
