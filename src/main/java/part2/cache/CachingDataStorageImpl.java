@@ -1,6 +1,7 @@
 package part2.cache;
 
 import db.DataStorage;
+import db.SlowBlockingDb;
 import db.SlowCompletableFutureDb;
 
 import java.util.concurrent.*;
@@ -10,7 +11,7 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
     private final DataStorage<String, T> db;
     private final int timeout;
     private final TimeUnit timeoutUnits;
-    // TODO can we use Map<String, T> here? Why?
+
     private final ConcurrentMap<String, OutdatableResult<T>> cache = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduledExecutorService =
             Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
@@ -32,12 +33,26 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
 
     @Override
     public OutdatableResult<T> getOutdatable(String key) {
-        // TODO implement
-        // TODO use ScheduledExecutorService to remove outdated result from cache - see SlowCompletableFutureDb implementation
-        // TODO complete OutdatableResult::outdated after removing outdated result from cache
-        // TODO don't use obtrudeException on result - just don't
-        // TODO use remove(Object key, Object value) to remove target value
-        // TODO Start timeout after receiving result in CompletableFuture, not after receiving CompletableFuture itself
-        throw new UnsupportedOperationException();
+       OutdatableResult<T> result = new OutdatableResult<>(new CompletableFuture<>(), new CompletableFuture<>());
+       OutdatableResult<T> outDated = cache.putIfAbsent(key, result);
+
+       if (outDated == null) {
+           db.get(key).whenComplete((res, exception) -> {
+               if (exception != null) {
+                   result.getResult().completeExceptionally(exception);
+               } else {
+                   result.getResult().complete(res);
+               }
+
+               scheduledExecutorService.schedule(() -> {
+                           cache.remove(get(key), result);
+                           result.getOutdated().complete(null);
+                       },
+                       timeout,
+                       timeoutUnits);
+           });
+           return result;
+       }
+       return outDated;
     }
 }
