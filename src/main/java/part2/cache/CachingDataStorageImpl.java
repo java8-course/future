@@ -41,15 +41,15 @@ public class CachingDataStorageImpl<T> implements CachingDataStorage<String, T> 
         }
 
         db.get(key).whenComplete((res, ex) -> {
-            scheduledExecutorService.schedule(() -> {
-                cache.remove(key, newResult);
-                newResult.getOutdated().complete(null);
-            }, timeout, timeoutUnits);
             if (ex != null) {
                 newResult.getResult().completeExceptionally(ex);
             } else {
                 newResult.getResult().complete(res);
             }
+            scheduledExecutorService.schedule(() -> {
+                cache.remove(key, newResult);
+                newResult.getOutdated().complete(null);
+            }, timeout, timeoutUnits);
         });
 
         return newResult;
