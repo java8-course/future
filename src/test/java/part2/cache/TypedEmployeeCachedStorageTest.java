@@ -57,13 +57,13 @@ public class TypedEmployeeCachedStorageTest {
     @Test
     public void expiration() throws ExecutionException, InterruptedException {
         final CachingDataStorageImpl<Employee> employeeCache =
-                new CachingDataStorageImpl<>(employeeDb, 1, TimeUnit.SECONDS);
+                new CachingDataStorageImpl<>(employeeDb, 3, TimeUnit.SECONDS);
 
         final CachingDataStorageImpl<Employer> employerCache =
                 new CachingDataStorageImpl<>(employerDb, 2, TimeUnit.SECONDS);
 
         final CachingDataStorageImpl<Position> positionCache =
-                new CachingDataStorageImpl<>(positionDb, 100, TimeUnit.MILLISECONDS);
+                new CachingDataStorageImpl<>(positionDb, 1, TimeUnit.SECONDS);
 
         Map<String, Employee> employeeTmp = new HashMap<>();
 
@@ -81,7 +81,7 @@ public class TypedEmployeeCachedStorageTest {
         assertEquals(aPerson.getResult().get().getJobHistoryEntries(),
                 Collections.singletonList(new data.typed.JobHistoryEntry(Position.BA, Employer.EPAM, 1)));
 
-        Thread.sleep(50);
+        Thread.sleep(500);
 
         employeeTmp = new HashMap<>();
         final Person person2 = new Person("Dagni", "Taggart", 30);
@@ -91,7 +91,7 @@ public class TypedEmployeeCachedStorageTest {
         final CachingDataStorage.OutdatableResult<data.typed.Employee> aPerson2 = typedCache.getOutdatable("a");
         assertEquals(aPerson2.getResult().get().getPerson(), person1);
 
-        Thread.sleep(100);
+        Thread.sleep(700);
         final CachingDataStorage.OutdatableResult<data.typed.Employee> aPerson3 = typedCache.getOutdatable("a");
 
         assertEquals(aPerson3.getResult().get().getPerson(), person2);
