@@ -19,10 +19,11 @@ public class MappingCachingDataStorage<K, K1, T1, T> implements CachingDataStora
 
     @Override
     public OutdatableResult<T> getOutdatable(K key) {
+        OutdatableResult<T1> outdatable = storage.getOutdatable(mapKey.apply(key));
 
-
-
-        // TODO
-        throw new UnsupportedOperationException();
+        return new OutdatableResult<>(
+                outdatable.getResult().thenApply(t1 -> mapValue.apply(key, t1)),
+                outdatable.getOutdated()
+        );
     }
 }
